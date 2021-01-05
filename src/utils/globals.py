@@ -1,6 +1,7 @@
 import logging
 import configparser
 
+
 # Read local `config.ini` file.
 config = configparser.ConfigParser()
 config.read('./config.ini')
