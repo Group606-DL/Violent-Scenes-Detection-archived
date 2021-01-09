@@ -1,62 +1,63 @@
+import glob
 import os
-import pickle
 import numpy as np
+from tqdm import tqdm
 from sklearn.model_selection import train_test_split
-from src.prepare_dataset.video_to_frames import video_to_frames
+from src.prepare_dataset.video_to_npy import video_to_npy
 from src.utils.globals import logger, config
 from src.utils.video_utils import get_video_name
 
-
-# def dataset_generator(data_paths: [str], labels: [int], figure_shape,seq_length,use_aug,use_crop,crop_x_y,classes = 1):
-#     while True:
-#         indexes = np.arange(len(data_paths))
-#         np.random.shuffle(indexes)
-#         select_indexes = indexes[:config['TRAIN']['BATCH_SIZE']]
-#         data_paths_batch = [data_paths[i] for i in select_indexes]
-#         labels_batch = [labels[i] for i in select_indexes]
-#
-#         # X, y = get_sequences(data_paths_batch,labels_batch,figure_shape,seq_length, classes, use_augmentation = use_aug,use_crop=use_crop,crop_x_y=crop_x_y)
-#
-#         # yield X, y
+NPY_FILE_TYPE = '.npy'
 
 
-def dataset_video_builder(dataset_path: str, violence_label: str, force: bool = False):
-    logger.debug(f'preparing dataset: {dataset_path}')
-    videos_directory = os.path.join(dataset_path, config['PATHS']['VIDEOS_FOLDER'])
+def dataset_video_builder(dataset_path: str, train_test: bool, force: bool = False):
+    videos_directories = [x[0] for x in os.walk(os.path.join(dataset_path, config['PATHS']['VIDEOS_FOLDER']))]
+    npy_directory = os.path.join(dataset_path, config['PATHS']['NPY_FOLDER'])
+
+    # Create a folder to save frames if the folder not existed
+    if not os.path.exists(npy_directory):
+        try:
+            os.makedirs(npy_directory)
+        except OSError:
+            logger.error(f"Can't create destination directory {npy_directory}!")
 
     dataset_frames = []
     videos_seq_length = []
     videos_frames_paths = []
     videos_labels = []
 
-    # TODO: process in parallel?
-    for video_file in os.listdir(videos_directory):
-        video_frames_path = os.path.join(dataset_path, config['PATHS']['FRAMES_FOLDER'], get_video_name(video_file))
-        video_sum_img_file = os.path.join(video_frames_path, 'video_summary.pkl')
+    for video_directory in tqdm(videos_directories):
+        files = [video_file for video_file in tqdm(os.listdir(video_directory)) if
+                 os.path.isfile(os.path.join(video_directory, video_file))]
+        if not files:
+            continue
 
-        # Check if there is already file summary of the video so we don't need to analyze it
-        if os.path.isfile(video_sum_img_file) and not force:
-            with open(video_sum_img_file, 'rb') as f:
-                video_frames = pickle.load(f)
-        else:
-            video_frames, video_frames_path = video_to_frames(dataset_path=dataset_path, video_file=video_file)
+        for video_file in files:
+            # Destination npy path
+            video_npy_path = os.path.join(dataset_path, 'npy', get_video_name(video_file) + NPY_FILE_TYPE)
 
-            if violence_label in get_video_name(video_file):
-                video_frames['label'] = 1
+            # Check if there is already file summary of the video so we don't need to analyze it
+            if os.path.isfile(video_npy_path) and not force:
+                with open(video_npy_path, 'rb') as f:
+                    video_frames = np.load(f)
+            else:
+                video_frames_data = video_to_npy(video_directory=video_directory,
+                                                 video_file=video_file)
 
-            with open(video_sum_img_file, 'wb') as f:
-                pickle.dump(video_frames, f, pickle.HIGHEST_PROTOCOL)
+                # Save as .npy file
+                np.save(video_npy_path, video_frames_data)
 
-        dataset_frames.append(video_frames)
-        videos_seq_length.append(video_frames['sequence_length'])
-        videos_frames_paths.append(video_frames['images_path'])
-        videos_labels.append(video_frames['label'])
+            dataset_frames.append(video_frames)
+            videos_seq_length.append(video_frames['sequence_length'])
+            videos_frames_paths.append(video_frames['images_path'])
+            videos_labels.append(video_frames['label'])
 
-    # Split dataset to test and train
-    x_train, x_test, y_train, y_test = train_test_split(videos_frames_paths, videos_labels, test_size=0.20,
-                                                        random_state=42)
+        # Split dataset to test and train
+        x_train, x_test, y_train, y_test = train_test_split(videos_frames_paths, videos_labels, test_size=0.20,
+                                                            random_state=42)
 
     # Split dataset to test and validation
-    x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.20, random_state=42)
+    x_train, x_validation, y_train, y_validation = train_test_split(x_train, y_train, test_size=0.20,
+                                                                    random_state=42)
 
-    return x_train, x_test, x_valid, y_train, y_test, y_valid
+    return x_train, x_test, x_validation, y_train, y_test, y_validation
