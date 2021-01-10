@@ -4,8 +4,8 @@ from src.prepare_dataset.dataset import VideoDataset
 # TODO: change to pkg and not relative imports
 
 datasets = [
-    # VideoDataset(dataset_name="violentflow", path="../data/violentflow"),
-    # VideoDataset(dataset_name="movies", path="../data/movies"),
+    VideoDataset(dataset_name="violentflow", path="../data/violentflow"),
+    VideoDataset(dataset_name="movies", path="../data/movies"),
     VideoDataset(dataset_name="ming", path="../data/ming", train_test=True)
 ]
 
