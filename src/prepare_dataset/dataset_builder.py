@@ -3,7 +3,8 @@ import os
 import numpy as np
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
-from src.prepare_dataset.video_to_npy import video_to_npy
+
+from src.prepare_dataset.video_builder import video_to_npy
 from src.utils.globals import logger, config
 from src.utils.video_utils import get_video_name
 
@@ -39,18 +40,17 @@ def dataset_video_builder(dataset_path: str, train_test: bool, force: bool = Fal
             # Check if there is already file summary of the video so we don't need to analyze it
             if os.path.isfile(video_npy_path) and not force:
                 with open(video_npy_path, 'rb') as f:
-                    video_frames = np.load(f)
+                    result = np.load(f)
             else:
-                video_frames_data = video_to_npy(video_directory=video_directory,
-                                                 video_file=video_file)
+                result = video_to_npy(video_directory=video_directory, video_file=video_file)
 
                 # Save as .npy file
-                np.save(video_npy_path, video_frames_data)
+                np.save(video_npy_path, result)
 
-            dataset_frames.append(video_frames)
-            videos_seq_length.append(video_frames['sequence_length'])
-            videos_frames_paths.append(video_frames['images_path'])
-            videos_labels.append(video_frames['label'])
+            dataset_frames.append(result['frames'])
+            videos_seq_length.append(result['sequence_length'])
+            videos_frames_paths.append(result['images_path'])
+            videos_labels.append(result['label'])
 
         # Split dataset to test and train
         x_train, x_test, y_train, y_test = train_test_split(videos_frames_paths, videos_labels, test_size=0.20,

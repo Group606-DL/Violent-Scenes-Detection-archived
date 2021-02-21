@@ -2,8 +2,7 @@ import math
 import os
 import cv2
 import numpy as np
-
-from src.utils.globals import logger
+from src.utils.globals import logger, config
 
 # Globals
 FRAMES_PER_SECOND = 5
@@ -85,6 +84,20 @@ def video_to_frames(video_directory: str, video_file: str):
     frames = np.array(frames)
     logger.debug(f'done extraction: {video_path}')
 
-    video_images = dict(frames=frames, name=video_file,
-                        label=0, sequence_length=count)
+    video_images = dict(frames=frames, name=video_file, label=0, sequence_length=count)
     return video_images
+
+
+def video_to_npy(video_directory, video_file):
+    video_frames = video_to_frames(video_directory=video_directory, video_file=video_file)
+
+    if config['LABELS']['NON_FIGHT'] not in video_directory:
+        video_frames['label'] = 1
+
+    flows = get_optical_flow(video_frames['frames'])
+
+    result = np.zeros((len(flows), 224, 224, 5))
+    result[..., :3] = video_frames
+    result[..., 3:] = flows
+
+    return result
